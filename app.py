@@ -1,48 +1,45 @@
-<<<<<<< HEAD
+"""Small Flask service used to demo a CI/CD pipeline: Docker -> Trivy -> Helm -> AWS EKS."""
+
+import os
+
+import mysql.connector
 from flask import Flask, jsonify
-import mysql.connector
-import os
-=======
-#it will be filled with the flask app code
-from flask import Flask
-import os
-import mysql.connector
->>>>>>> 4c36fb9740b783d66194b50e1d41a8086f97fb66
 
 app = Flask(__name__)
 
+
 def get_db_connection():
+    """Open a MySQL connection from environment variables (no credentials in code)."""
     return mysql.connector.connect(
-        host=os.getenv("DB_HOST"),
-        user=os.getenv("DB_USER"),
-        password=os.getenv("DB_PASSWORD"),
-        database=os.getenv("DB_NAME")
+        host=os.environ["DB_HOST"],
+        user=os.getenv("DB_USER", "app"),
+        password=os.environ["DB_PASSWORD"],
+        database=os.getenv("DB_NAME", "app"),
     )
+
 
 @app.route("/")
 def home():
-    return "Flask + MySQL running on EKS!"
+    return "Flask app running on Kubernetes!"
+
+
+@app.route("/health")
+def health():
+    return jsonify(status="ok")
+
 
 @app.route("/users")
 def users():
+    if not os.getenv("DB_HOST"):
+        return jsonify(error="database not configured"), 503
     db = get_db_connection()
-    cursor = db.cursor()
-    cursor.execute("SELECT id, name FROM users;")
-    result = cursor.fetchall()
-    return jsonify(result)
+    try:
+        cursor = db.cursor()
+        cursor.execute("SELECT id, name FROM users;")
+        return jsonify([{"id": row[0], "name": row[1]} for row in cursor.fetchall()])
+    finally:
+        db.close()
+
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
-
-
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_NAME = os.getenv("DB_NAME", "test")
-DB_USER = "root"
-DB_PASS = os.getenv("DB_ROOT_PASSWORD", "root")
-
-conn = mysql.connector.connect(
-    host=DB_HOST,
-    user=DB_USER,
-    password=DB_PASS,
-    database=DB_NAME
-)
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", "5000")))

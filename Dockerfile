@@ -1,14 +1,19 @@
-#this file will be used as our main dockerfile
+FROM python:3.12-slim
 
-FROM python:3.10
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-COPY requirements.txt requirements.txt
-RUN pip install -r requirements.txt
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY app.py .
+
+# Run as a non-root user
+RUN useradd --create-home --uid 10001 appuser
+USER 10001
 
 EXPOSE 5000
 
-CMD ["python", "app.py"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "app:app"]
